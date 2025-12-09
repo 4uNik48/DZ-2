@@ -1,79 +1,57 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, lag, sum as spark_sum
-from pyspark.sql.window import Window
+# COVID-19 Data Analysis with Apache Spark
 
-# Инициализация Spark
-spark = SparkSession.builder \
-    .appName("COVID19_DataFrame_Analysis") \
-    .getOrCreate()
+## Описание
+В данной работе выполнен анализ датасета по заболеваемости COVID-19 с использованием Apache Spark и DataFrame API.  
+Цель работы — изучить структуру данных и получить практические навыки обработки и агрегации данных в Spark.
 
-# Загрузка датасета
-df = spark.read \
-    .option("header", "true") \
-    .option("inferSchema", "true") \
-    .csv("covid-data.csv") \
-    .withColumn("date", to_date(col("date")))
+## Используемые инструменты
+- Apache Spark (PySpark)
+- Python 3
+- DataFrame API
 
-# =====================================================
-# Задание 1
-# 15 стран с наибольшим процентом переболевших на 31.03.2021
-# =====================================================
-top_15_countries = (
-    df.filter(col("date") == "2021-03-31")
-      .select(
-          col("iso_code"),
-          col("location").alias("country"),
-          col("total_cases"),
-          col("population")
-      )
-      .withColumn(
-          "recovered_percent",
-          col("total_cases") / col("population") * 100
-      )
-      .orderBy(col("recovered_percent").desc())
-      .select("iso_code", "country", "recovered_percent")
-      .limit(15)
-)
+## Источник данных
+Официальный датасет по COVID-19, содержащий информацию по странам, датам, числу заболевших и демографическим показателям.
 
-# =====================================================
-# Задание 2
-# Топ-10 стран по количеству новых случаев
-# за последнюю неделю марта 2021
-# =====================================================
-top_10_countries = (
-    df.filter((col("date") >= "2021-03-24") & (col("date") <= "2021-03-31"))
-      .groupBy("location")
-      .agg(spark_sum("new_cases").alias("new_cases_week"))
-      .orderBy(col("new_cases_week").desc())
-      .select(
-          col("location").alias("country"),
-          col("new_cases_week")
-      )
-      .limit(10)
-)
+## Выполненные задания
 
-# =====================================================
-# Задание 3
-# Изменение количества новых случаев в России
-# относительно предыдущего дня
-# =====================================================
-window = Window.orderBy("date")
+### 1. Топ-15 стран по проценту переболевших на 31 марта 2021
+Для даты 31.03.2021 рассчитан процент переболевших как отношение общего числа случаев к населению страны.  
+Результат отсортирован по убыванию, выбраны 15 стран с максимальным значением.
 
-russia_daily_delta = (
-    df.filter(
-        (col("location") == "Russia") &
-        (col("date") >= "2021-03-24") &
-        (col("date") <= "2021-03-31")
-    )
-    .select("date", col("new_cases"))
-    .withColumn("yesterday_cases", lag("new_cases").over(window))
-    .withColumn("delta", col("new_cases") - col("yesterday_cases"))
-    .select(
-        col("date"),
-        col("yesterday_cases"),
-        col("new_cases"),
-        col("delta")
-    )
-)
+**Используемые колонки:**
+- `iso_code`
+- `location`
+- `total_cases`
+- `population`
 
-spark.stop()
+---
+
+### 2. Топ-10 стран по числу новых случаев за последнюю неделю марта 2021
+Произведена агрегация количества новых случаев за период с 25 по 31 марта 2021 года.  
+Результат отсортирован по убыванию суммарного числа новых случаев.
+
+**Используемые колонки:**
+- `date`
+- `location`
+- `new_cases`
+
+---
+
+### 3. Изменение числа новых случаев в России за последнюю неделю марта 2021
+Для России рассчитано дневное изменение количества новых случаев относительно предыдущего дня
+с использованием оконной функции `lag`.
+
+**Результирующие колонки:**
+- `date`
+- `yesterday_cases`
+- `new_cases`
+- `delta`
+
+---
+
+## Запуск
+1. Убедиться, что Apache Spark установлен и доступен в окружении
+2. Поместить файл `covid-data.csv` в директорию со скриптом
+3. Запустить команду:
+   ```bash
+   spark-submit covid_analysis.py
